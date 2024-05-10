@@ -193,7 +193,7 @@ public class OpenPrefirePrac : BasePlugin
             // Auto start first practice
             if (_defaultPlayerSettings.ChainPractices)
             {
-                StartPractice(owner, 0);
+                StartPractice(player, 0);
             }
         }
     }
