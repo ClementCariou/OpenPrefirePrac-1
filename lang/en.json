@@ -19,6 +19,8 @@
     "practice.begin": "Happy training!",
     "practice.exit": "Prefire mode exited.",
     "practice.finish": "Congratulations! You have finished your prefire practice!",
+    "practice.lastmap": "That was the last map.",
+    "practice.changemap": "Switching map to {0} in 5 seconds.",
     "practice.progress": "Total number of targets: {0}; Remaining number of targets: {1}",
     "practice.help": "Usage: !prefire prac [PURPLE][1-{0}][NORMAL]",
     "difficulty.title": "Choose a difficulty level",

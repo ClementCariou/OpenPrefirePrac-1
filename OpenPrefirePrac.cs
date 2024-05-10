@@ -189,6 +189,12 @@ public class OpenPrefirePrac : BasePlugin
 
             // Record player language
             _translator!.RecordPlayerCulture(player);
+            
+            // Auto start first practice
+            if (_defaultPlayerSettings.ChainPractices)
+            {
+                StartPractice(owner, 0);
+            }
         }
     }
 
@@ -442,9 +448,17 @@ public class OpenPrefirePrac : BasePlugin
                             {
                                 // Load next map if possible
                                 var mapIndex = _defaultPlayerSettings.MapOrder.IndexOf(_mapName);
-                                if (mapIndex >= 0 && mapIndex < _defaultPlayerSettings.MapOrder.Count - 1)
+                                if(mapIndex >= _defaultPlayerSettings.MapOrder.Count - 1)
                                 {
-                                    ChangeMap(owner, _defaultPlayerSettings.MapOrder[mapIndex + 1]);
+                                    owner.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(owner, "practice.lastmap")}");
+                                }
+                                else if (mapIndex >= 0)
+                                {
+                                    var nextMapName = _defaultPlayerSettings.MapOrder[mapIndex + 1];
+                                    owner.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(owner, "practice.changemap", nextMapName)}");
+                                    AddTimer(5.0f, () => {
+                                        ChangeMap(owner, nextMapName);
+                                    });
                                 }
                             }
                         }
