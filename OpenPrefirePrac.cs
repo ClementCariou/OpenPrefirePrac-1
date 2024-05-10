@@ -439,7 +439,7 @@ public class OpenPrefirePrac : BasePlugin
                             }
                             else
                             {
-                                // Next map if possible
+                                // Load next map if possible
                                 var mapIndex = _defaultPlayerSettings.MapOrder.IndexOf(_mapName);
                                 if (mapIndex >= 0 && mapIndex < _defaultPlayerSettings.MapOrder.Count - 1)
                                 {
