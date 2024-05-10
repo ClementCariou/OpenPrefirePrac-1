@@ -428,6 +428,25 @@ public class OpenPrefirePrac : BasePlugin
                         // Practice finished.
                         owner.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(owner, "practice.finish")}");
                         ExitPrefireMode(owner);
+
+                        if (_defaultPlayerSettings.ChainPractices)
+                        {
+                            // Chain practice
+                            if (_playerStatuses[owner].PracticeIndex < _practices.Count - 1)
+                            {
+                                // Next practice
+                                StartPractice(owner, _playerStatuses[owner].PracticeIndex + 1);
+                            }
+                            else
+                            {
+                                // Next map if possible
+                                var mapIndex = _defaultPlayerSettings.MapOrder.IndexOf(_mapName);
+                                if (mapIndex >= 0 && mapIndex < _defaultPlayerSettings.MapOrder.Count - 1)
+                                {
+                                    ChangeMap(owner, _defaultPlayerSettings.MapOrder[mapIndex + 1]);
+                                }
+                            }
+                        }
                     }
                 }
                 else
@@ -1224,6 +1243,8 @@ public class OpenPrefirePrac : BasePlugin
         int tmpDifficulty = tmpStatus.HealingMethod;
         int tmpTrainingMode = tmpStatus.TrainingMode;
         int tmpBotWeapon = tmpStatus.BotWeapon;
+        bool tmpChainPractices = false;
+        List<string> tmpMapOrder = new();
 
         if (!File.Exists(path))
         {
@@ -1261,6 +1282,12 @@ public class OpenPrefirePrac : BasePlugin
                     tmpBotWeapon = jsonConfig.BotWeapon;
                 }
 
+                if (jsonConfig.ChainPractices)
+                {
+                    tmpChainPractices = jsonConfig.ChainPractices;
+                    tmpMapOrder = jsonConfig.MapOrder;
+                }
+
                 Console.WriteLine($"[OpenPrefirePrac] Using default settings: Difficulty = {tmpDifficulty}, TrainingMode = {tmpTrainingMode}, BotWeapon = {tmpBotWeapon}");
             }
             catch (System.Exception)
@@ -1270,7 +1297,7 @@ public class OpenPrefirePrac : BasePlugin
             }
         }
 
-        _defaultPlayerSettings = new DefaultConfig(tmpDifficulty, tmpTrainingMode, tmpBotWeapon);
+        _defaultPlayerSettings = new DefaultConfig(tmpDifficulty, tmpTrainingMode, tmpBotWeapon, tmpChainPractices, tmpMapOrder);
     }
 
     private void StartPractice(CCSPlayerController player, int practiceIndex)

@@ -16,5 +16,9 @@
     //   2: Bots use AK47.
     //   3: Bots use Scout.
     //   4: Bots use AWP.
-    "BotWeapon": 0
+    "BotWeapon": 0,
+	// Chain practices automatically
+	"ChainPractices": true
+	// Ordered map list
+	"MapOrder": ["de_inferno", "de_mirage", "de_dust2", "de_nuke", "de_overpass", "de_ancient", "de_anubis"],
 }
