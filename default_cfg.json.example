@@ -18,7 +18,7 @@
     //   4: Bots use AWP.
     "BotWeapon": 0,
 	// Chain practices automatically
-	"ChainPractices": true
+	"ChainPractices": true,
 	// Ordered map list
 	"MapOrder": ["de_inferno", "de_mirage", "de_dust2", "de_nuke", "de_overpass", "de_ancient", "de_anubis"],
 }
