@@ -427,15 +427,16 @@ public class OpenPrefirePrac : BasePlugin
                     {
                         // Practice finished.
                         owner.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(owner, "practice.finish")}");
+                        var previousPracticeNo = _playerStatuses[owner].PracticeIndex;
                         ExitPrefireMode(owner);
 
                         if (_defaultPlayerSettings.ChainPractices)
                         {
                             // Chain practice
-                            if (_playerStatuses[owner].PracticeIndex < _practices.Count - 1)
+                            if (previousPracticeNo < _practices.Count - 1)
                             {
                                 // Next practice
-                                StartPractice(owner, _playerStatuses[owner].PracticeIndex + 1);
+                                StartPractice(owner, previousPracticeNo + 1);
                             }
                             else
                             {
