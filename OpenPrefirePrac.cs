@@ -58,7 +58,6 @@ public class OpenPrefirePrac : BasePlugin
 
         _translator = new Translator(Localizer, ModuleDirectory, CultureInfo.CurrentCulture.Name);
         
-	    Console.WriteLine("[OpenPrefirePrac] Registering listeners.");
         RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServerHandler);
         RegisterListener<Listeners.OnMapStart>(OnMapStartHandler);
         RegisterListener<Listeners.OnTick>(OnTickHandler);
@@ -107,11 +106,17 @@ public class OpenPrefirePrac : BasePlugin
         {
             _timerBroadcastProgress = AddTimer(3f, () => PrintProgress(), TimerFlags.REPEAT);
         }
+
+        Console.WriteLine("[OpenPrefirePrac] Plugin has been loaded. If the plugin is neither loaded along with server startup, nor reloaded on the fly, please reload it once to make it fully functional.");
     }
 
     public override void Unload(bool hotReload)
     {
         UnregisterCommand();
+
+        RemoveListener<Listeners.OnClientPutInServer>(OnClientPutInServerHandler);
+        RemoveListener<Listeners.OnMapStart>(OnMapStartHandler);
+        RemoveListener<Listeners.OnTick>(OnTickHandler);
 
         if (hotReload)
         {
@@ -139,6 +144,8 @@ public class OpenPrefirePrac : BasePlugin
             _timerBroadcastProgress.Kill();
             _timerBroadcastProgress = null;
         }
+
+        Console.WriteLine("[OpenPrefirePrac] Plugin has been unloaded.");
     }
 
     // TODO: Figure out if we can use the GameEventHandler attribute here instead
@@ -1003,6 +1010,8 @@ public class OpenPrefirePrac : BasePlugin
 
         string[] stringConvarNames = [
             "bot_quota_mode",
+            "mp_ct_default_melee",
+            "mp_t_default_melee",
         ];
 
         try
@@ -1171,6 +1180,8 @@ public class OpenPrefirePrac : BasePlugin
         Server.ExecuteCommand("bot_max_vision_distance_override 99999");
 
         Server.ExecuteCommand("bot_quota_mode normal");
+        Server.ExecuteCommand("mp_ct_default_melee \"\"");
+        Server.ExecuteCommand("mp_t_default_melee \"\"");
         
         Server.ExecuteCommand("mp_warmup_start");
         Server.ExecuteCommand("bot_kick all");
