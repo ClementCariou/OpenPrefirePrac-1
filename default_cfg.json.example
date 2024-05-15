@@ -21,4 +21,8 @@
 	"ChainPractices": true,
 	// Ordered map list
 	"MapOrder": ["de_inferno", "de_mirage", "de_dust2", "de_nuke", "de_overpass", "de_ancient", "de_anubis"],
+    // Aim lock for bots:
+    //   false: CS2's native bot behavior. It works in a consistant manner but is less powerful.
+    //   true: Bots always aim at players' heads. But this may conflict with CS2's native bot logic, causing bots to not react under certain circumstances.
+    "BotAimLock": true
 }

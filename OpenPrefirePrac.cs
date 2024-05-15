@@ -8,7 +8,6 @@ using CounterStrikeSharp.API.Modules.Memory;
 using Vector = CounterStrikeSharp.API.Modules.Utils.Vector;
 using System.Globalization;
 using CounterStrikeSharp.API.Modules.Cvars;
-using System.Text.Json;
 using CounterStrikeSharp.API.Core.Commands;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Entities;
@@ -28,7 +27,7 @@ public class OpenPrefirePrac : BasePlugin
     
     private readonly Dictionary<string, int> _practiceNameToId = new();
     
-    private readonly Dictionary<int, bool> _practiceEnabled = new();
+    private readonly Dictionary<int, int> _pracConflictCount = new();           // Num of on-going practices that might interfere
     
     private string _mapName = "";
     
@@ -62,14 +61,15 @@ public class OpenPrefirePrac : BasePlugin
         RegisterListener<Listeners.OnMapStart>(OnMapStartHandler);
         RegisterListener<Listeners.OnTick>(OnTickHandler);
 
-        LoadDefaultSettings();
+        _defaultPlayerSettings = new DefaultConfig(ModuleDirectory);
+        _defaultPlayerSettings.LoadDefaultSettings();
 
         if (hotReload)
         {
             // Clear status registers
             _ownerOfBots.Clear();
             _practiceNameToId.Clear();
-            _practiceEnabled.Clear();
+            _pracConflictCount.Clear();
             _practices.Clear();
             _availableMaps.Clear();
             _mapName = "";
@@ -123,7 +123,7 @@ public class OpenPrefirePrac : BasePlugin
             // Clear status registers
             _ownerOfBots.Clear();
             _practiceNameToId.Clear();
-            _practiceEnabled.Clear();
+            _pracConflictCount.Clear();
             _practices.Clear();
             _availableMaps.Clear();
             _mapName = "";
@@ -690,13 +690,13 @@ public class OpenPrefirePrac : BasePlugin
         var practiceFiles = new List<string>(Directory.EnumerateFiles($"{ModuleDirectory}/maps/{_mapName}"));
         _practices.Clear();
         _practiceNameToId.Clear();
-        _practiceEnabled.Clear();
+        _pracConflictCount.Clear();
         for (var i = 0; i < practiceFiles.Count; i++)
         {
             var practiceName = practiceFiles[i].Substring(practiceFiles[i].LastIndexOf(Path.DirectorySeparatorChar) + 1).Split(".")[0];
             _practices.Add(new PrefirePractice(ModuleDirectory, _mapName, practiceName));
             _practiceNameToId.Add(practiceName, i);
-            _practiceEnabled.Add(i, true);
+            _pracConflictCount.Add(i, 0);
             Console.WriteLine($"[OpenPrefirePrac] {_mapName} {practiceName} Loaded.");
         }
     }
@@ -1268,72 +1268,6 @@ public class OpenPrefirePrac : BasePlugin
         bot.CommitSuicide(false, false);
     }
 
-    private void LoadDefaultSettings()
-    {
-        string path = $"{ModuleDirectory}/default_cfg.json";
-
-        // Read default settings from PlayerStatus.cs
-        PlayerStatus tmpStatus = new PlayerStatus();
-        int tmpDifficulty = tmpStatus.HealingMethod;
-        int tmpTrainingMode = tmpStatus.TrainingMode;
-        int tmpBotWeapon = tmpStatus.BotWeapon;
-        bool tmpChainPractices = false;
-        List<string> tmpMapOrder = new();
-
-        if (!File.Exists(path))
-        {
-            // Use default settings
-            Console.WriteLine("[OpenPrefirePrac] No default settings provided. Will use default settings.");
-        }
-        else
-        {
-            // Load settings from default_cfg.json
-            JsonSerializerOptions options = new JsonSerializerOptions
-            {
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true,
-
-            };
-
-            string jsonString = File.ReadAllText(path);
-            
-            try
-            {
-                DefaultConfig jsonConfig = JsonSerializer.Deserialize<DefaultConfig>(jsonString, options)!;
-
-                if (jsonConfig.Difficulty > -1 && jsonConfig.Difficulty < 5)
-                {
-                    tmpDifficulty = jsonConfig.Difficulty;
-                }
-
-                if (jsonConfig.TrainingMode > -1 && jsonConfig.TrainingMode < 2)
-                {
-                    tmpTrainingMode = jsonConfig.TrainingMode;
-                }
-                
-                if (jsonConfig.BotWeapon > -1 && jsonConfig.BotWeapon < 5)
-                {
-                    tmpBotWeapon = jsonConfig.BotWeapon;
-                }
-
-                if (jsonConfig.ChainPractices)
-                {
-                    tmpChainPractices = jsonConfig.ChainPractices;
-                    tmpMapOrder = jsonConfig.MapOrder;
-                }
-
-                Console.WriteLine($"[OpenPrefirePrac] Using default settings: Difficulty = {tmpDifficulty}, TrainingMode = {tmpTrainingMode}, BotWeapon = {tmpBotWeapon}");
-            }
-            catch (System.Exception)
-            {
-                Console.WriteLine("[OpenPrefirePrac] Failed to load custom settings. Will use default settings.");
-                
-            }
-        }
-
-        _defaultPlayerSettings = new DefaultConfig(tmpDifficulty, tmpTrainingMode, tmpBotWeapon, tmpChainPractices, tmpMapOrder);
-    }
-
     private void StartPractice(CCSPlayerController player, int practiceIndex)
     {
         if (_playerCount == 0)
@@ -1345,16 +1279,15 @@ public class OpenPrefirePrac : BasePlugin
 
         var previousPracticeIndex = _playerStatuses[player].PracticeIndex;
 
-        // Check if selected practice route is compatible with other on-playing routes.
-        if (previousPracticeIndex != practiceIndex && !_practiceEnabled[practiceIndex])
-        {
-            player.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(player, "practice.incompatible")}");
-            return;
-        }
-
-        
         if (previousPracticeIndex != practiceIndex)
         {
+            // Check if selected practice route is compatible with other on-playing routes.
+            if (_pracConflictCount[practiceIndex] > 0)
+            {
+                player.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(player, "practice.incompatible")}");
+                return;
+            }
+
             // Update practice status
             if (previousPracticeIndex > -1)
             {
@@ -1372,10 +1305,10 @@ public class OpenPrefirePrac : BasePlugin
                 if (_practiceNameToId.ContainsKey(_practices[practiceIndex].IncompatiblePractices[i]))
                 {
                     var disabledPracticeNo = _practiceNameToId[_practices[practiceIndex].IncompatiblePractices[i]];
-                    _practiceEnabled[disabledPracticeNo] = false;
+                    _pracConflictCount[disabledPracticeNo]++;
                 }
             }
-            _practiceEnabled[practiceIndex] = false;
+            _pracConflictCount[practiceIndex]++;
 
             // Setup practice
             AddBot(player, _practices[practiceIndex].NumBots);
@@ -1665,7 +1598,7 @@ public class OpenPrefirePrac : BasePlugin
         // Add menu options for practices
         for (var i = 0; i < _practices.Count; i++)
         {
-            if (_practiceEnabled[i])
+            if (_pracConflictCount[i] == 0)
             {
                 var tmpLocalizedPracticeName = _translator.Translate(player, $"map.{_mapName}.{_practices[i].PracticeName}");
                 _playerStatuses[player].LocalizedPracticeNames.Add(tmpLocalizedPracticeName, i);
@@ -1701,10 +1634,10 @@ public class OpenPrefirePrac : BasePlugin
             {
                 if (_practiceNameToId.TryGetValue(_practices[previousPracticeNo].IncompatiblePractices[i], out var value))
                 {
-                    _practiceEnabled[value] = true;
+                    _pracConflictCount[value]--;
                 }
             }
-            _practiceEnabled[previousPracticeNo] = true;
+            _pracConflictCount[previousPracticeNo]--;
 
             _playerStatuses[player].PracticeIndex = -1;
             _playerCount--;
@@ -1849,42 +1782,45 @@ public class OpenPrefirePrac : BasePlugin
 
     private void OnTickHandler()
     {
-        foreach (var player in _playerStatuses.Keys)
+        if (_defaultPlayerSettings!.BotAimLock)
         {
-            if (player == null || !player.IsValid || !player.PawnIsAlive || player.PlayerPawn.Value == null)
+            foreach (var player in _playerStatuses.Keys)
             {
-                continue;
-            }
-
-            // Aimlock bots
-            Vector ownerEyePos = new Vector(player.PlayerPawn.Value.AbsOrigin!.X, player.PlayerPawn.Value.AbsOrigin!.Y, player.PlayerPawn.Value.AbsOrigin!.Z + player.PlayerPawn.Value.ViewmodelOffsetZ);
-
-            foreach(var bot in _playerStatuses[player].Bots)
-            {
-                if (!bot.IsValid || !bot.PawnIsAlive || bot.PlayerPawn.Value == null)
+                if (player == null || !player.IsValid || !player.PawnIsAlive || player.PlayerPawn.Value == null)
                 {
                     continue;
                 }
 
-                Vector botEyePosition = new Vector(bot.PlayerPawn.Value.AbsOrigin!.X, bot.PlayerPawn.Value.AbsOrigin!.Y, bot.PlayerPawn.Value.AbsOrigin!.Z + bot.PlayerPawn.Value.ViewmodelOffsetZ);
+                // Aimlock bots
+                Vector ownerEyePos = new Vector(player.PlayerPawn.Value.AbsOrigin!.X, player.PlayerPawn.Value.AbsOrigin!.Y, player.PlayerPawn.Value.AbsOrigin!.Z + player.PlayerPawn.Value.ViewmodelOffsetZ);
 
-                // calculate angle
-                float deltaX = ownerEyePos.X - botEyePosition.X;
-                float deltaY = ownerEyePos.Y - botEyePosition.Y;
-                float deltaZ = ownerEyePos.Z - botEyePosition.Z;
-                double yaw = 180 * Math.Atan2(deltaY, deltaX) / Math.PI;
-                double tmp = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
-                double pitch= 180 * Math.Atan2(-1 * deltaZ, tmp) / Math.PI;
-                QAngle angle = new QAngle((float)pitch, (float)yaw, 0);
-
-                Server.NextFrame(() => {
-                    if (pitch < 15 && pitch > -15)
+                foreach(var bot in _playerStatuses[player].Bots)
+                {
+                    if (!bot.IsValid || !bot.PawnIsAlive || bot.PlayerPawn.Value == null)
                     {
-                        bot.PlayerPawn.Value.Teleport(null, angle, null);
+                        continue;
                     }
-                    bot.PlayerPawn.Value.EyeAngles.X = (float)pitch;
-                    bot.PlayerPawn.Value.EyeAngles.Y = (float)yaw;
-                });
+
+                    Vector botEyePosition = new Vector(bot.PlayerPawn.Value.AbsOrigin!.X, bot.PlayerPawn.Value.AbsOrigin!.Y, bot.PlayerPawn.Value.AbsOrigin!.Z + bot.PlayerPawn.Value.ViewmodelOffsetZ);
+
+                    // calculate angle
+                    float deltaX = ownerEyePos.X - botEyePosition.X;
+                    float deltaY = ownerEyePos.Y - botEyePosition.Y;
+                    float deltaZ = ownerEyePos.Z - botEyePosition.Z;
+                    double yaw = 180 * Math.Atan2(deltaY, deltaX) / Math.PI;
+                    double tmp = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+                    double pitch= 180 * Math.Atan2(-1 * deltaZ, tmp) / Math.PI;
+                    QAngle angle = new QAngle((float)pitch, (float)yaw, 0);
+
+                    Server.NextFrame(() => {
+                        if (pitch < 15 && pitch > -15)
+                        {
+                            bot.PlayerPawn.Value.Teleport(null, angle, null);
+                        }
+                        bot.PlayerPawn.Value.EyeAngles.X = (float)pitch;
+                        bot.PlayerPawn.Value.EyeAngles.Y = (float)yaw;
+                    });
+                }
             }
         }
     }
